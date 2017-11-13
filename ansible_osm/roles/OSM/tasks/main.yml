@@ -1,0 +1,54 @@
+---
+  - name: update package list
+    apt:
+      update_cache: yes
+
+  - name: install required packages
+    apt:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - "{{ osm_packages }}"
+
+  - name: install gem2.3 bundler
+    command: gem2.3 install bundler
+
+  - name: clone openstreetmap git
+    command: chdir=/root/ git clone --depth=1 https://github.com/openstreetmap/openstreetmap-website.git
+    ignore_errors: yes
+
+  - name: install openstreetmap webapp
+    command: bash -lc "cd /root/openstreetmap-website/ && bundle install"
+
+  - name: copy apllication config file
+    template: src=templates/application.yml dest=/root/openstreetmap-website/config/application.yml
+
+  - name: configure db
+    template: src=templates/database.yml dest=/root/openstreetmap-website/config/database.yml
+
+  - name: postgresql server conf
+    template: src=templates/postgresql.conf dest=/etc/postgresql/9.5/main/postgresql.conf
+
+  - name: postgresql server conf/client auth
+    template: src=templates/pg_hba.conf dest=/etc/postgresql/9.5/main/pg_hba.conf
+
+  - name: restart postgresql
+    service: name=postgresql state=restarted enabled=yes
+
+  - name: create db username
+    command: createuser -s root
+    become: yes
+    become_user: postgres
+    ignore_errors: yes
+
+  - name: create dbs
+    command: bash -lc "cd /root/openstreetmap-website/ && bundle exec rake db:create"
+
+  - name: finalize db configuration
+    script: ./roles/OSM/files/db_config.py
+    run_once: true
+
+  - name: app configuration and verification
+    command: bash -lc "cd /root/openstreetmap-website/ && bundle exec rake db:migrate"
+    command: bash -lc "cd /root/openstreetmap-website/ && bundle exec rake test:db"
+    command: bash -lc "cd /root/openstreetmap-website/ && bundle exec rails server"

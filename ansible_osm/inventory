@@ -1,0 +1,5 @@
+[all:vars] #python3 comptability for Ubutun 16.04 hosts
+ansible_python_interpreter=/usr/bin/python3
+
+[OSM]
+osm ansible_ssh_host=192.168.77.100
